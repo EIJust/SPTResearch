@@ -12,8 +12,11 @@ def get_row_from_csv(path):
     return data
 
 
-def merge_data_to_csv(path, *data):
-    pass
+def save_to_csv(output_path, collection):
+    with open(output_path, 'w+') as csv_file:
+        csv_writer = csv.writer(csv_file, delimiter=';', quotechar='|')
+        for item in collection:
+            csv_writer.writerow(item)
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -26,4 +29,4 @@ if __name__ == '__main__':
     ins_data = get_row_from_csv(options.ins_file)
     tof_data = get_row_from_csv(options.tof_file)
 
-    merge_data_to_csv('builder_output.csv', ins_data, tof_data)
+    merge_data = zip(ins_data, tof_data)
