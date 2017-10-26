@@ -51,21 +51,22 @@ class Trilateration:
         return value / count_vaild_dist
 
 
-def get_distances_from_db_by_tag_id(db_path, tag_id):
+def get_distance_logs_from_db_by_tag_id(db_path, tag_id):
     conn = sqlite3.connect(db_path)
     rows = conn.execute("SELECT * FROM HidReportLogs;")
 
-    distances = []
+    distance_logs = []
     for row in rows:
         row_dist = list()
+        log_time = row[2]
         if row[3] == tag_id:
             str_bytes = row[1].split(',')
             for i in range(0, 6):
                 distance_int = (list(map(int, str_bytes[i * 2 + 1: i * 2 + 3])))
                 row_dist.append(distance_int)
-            distances.append(row_dist)
+            distance_logs.append([row_dist, log_time])
 
-    return distances
+    return distance_logs
 
 
 def get_points(anchors, distances):
@@ -109,9 +110,8 @@ if __name__ == '__main__':
                Anchor(4, 20, 0, 2.5),
                Anchor(5, 8, 0, 2.5)]
 
-    distances = get_distances_from_db_by_tag_id(input_filename, 17)
-    print(distances)
-    points = get_points(anchors, distances)
+    dist_logs = get_distance_logs_from_db_by_tag_id(input_filename, 17)
+    points = get_points(anchors, dist_logs)
     save_points_to_csv(output_filename, points)
 
     print(len(points))
