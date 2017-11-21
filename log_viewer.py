@@ -1,5 +1,6 @@
 import sqlite3
 import math
+import argparse
 
 import pandas as pd
 import numpy as np
@@ -69,19 +70,22 @@ def from_sqlite(db_path, tag_id=None, empty_filter=False):
     df['LogTime'] = pd.to_datetime(df['LogTime'])
     df['LogTime'] = df['LogTime'].apply(lambda x: x.minute*60+x.second)
 
-    print(df)
-
     return df
 
 
 if __name__ == '__main__':
-    df = from_sqlite('log.sqlite', empty_filter=True)
-    anchors = [[0, 0, 0],
-               [0, 0, 0],
-               [0, 0, 0],
-               [0, 0, 0],
-               [0, 0, 0],
-               [0, 0, 0]]
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-l', '--logs', type=str, help='.sqlite logs file')
+    args = parser.parse_args()
+    logs_path = args.logs
+
+    df = from_sqlite(logs_path, empty_filter=True)
+    anchors = [[9, 3.5, 3],
+               [9, 0, 3],
+               [0, 0, 3],
+               [0, 3.5, 3],
+               [3, 1.75, 3],
+               [6, 1.75, 3]]
 
     positions_x = list()
     positions_y = list()
