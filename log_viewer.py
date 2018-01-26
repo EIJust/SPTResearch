@@ -1,12 +1,12 @@
 import sqlite3
 import math
-import argparse
+import glob
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
-from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import minimize
 
 
@@ -52,6 +52,7 @@ def from_sqlite(db_path, tag_id=None, empty_filter=False):
             str_bytes = row[1].split(',')
             anchor_count = int(str_bytes[0])
             empty_count = 0
+            rssi = int(str_bytes[len(str_bytes)-1])
             for i in range(0, anchor_count):
                 distance_int = (list(map(int, str_bytes[i * 2 + 1: i * 2 + 3])))
                 if distance_int == [255, 255]:
@@ -62,46 +63,54 @@ def from_sqlite(db_path, tag_id=None, empty_filter=False):
                 if distance_int is None:
                     empty_count += 1
             if empty_filter and empty_count != anchor_count:
-                distance_logs.append([row_dist, log_time])
+                distance_logs.append([row_dist, rssi, log_time])
             elif not empty_filter:
-                distance_logs.append([row_dist, log_time])
+                distance_logs.append([row_dist, rssi, log_time])
 
-    df = pd.DataFrame(data=distance_logs, columns=['Distance', 'LogTime'])
+    df = pd.DataFrame(data=distance_logs, columns=['Distance', 'RSSI', 'LogTime'])
     df['LogTime'] = pd.to_datetime(df['LogTime'])
     df['LogTime'] = df['LogTime'].apply(lambda x: x.minute*60+x.second)
 
     return df
 
 
+def get_sma(values, buff_size=5):
+    sma = list()
+    sma.append(values[0])
+    for i in range(1, buff_size):
+        s = 0
+        for j in range(0, i):
+            s += values[j]
+        s /= i
+        sma.append(s)
+    for i in range(buff_size, len(values)):
+        sma.append(sma[i-1] - values[i-buff_size]/buff_size + values[i]/buff_size)
+    return sma
+
+
+def get_comp_filt(values, alp=0.7):
+    filt = list()
+    filt.append(values[0])
+    for i in range(1, len(values)):
+        filt.append(filt[i-1]*alp + values[i]*(1-alp))
+    return filt
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-l', '--logs', type=str, help='.sqlite logs file')
-    args = parser.parse_args()
-    logs_path = args.logs
+    log_files = glob.glob("logs/*.sqlite")
+    plt.subplots_adjust(hspace=1)
+    for log_file in log_files:
+        df = from_sqlite(log_file, empty_filter=True)
 
-    df = from_sqlite(logs_path, empty_filter=True)
-    anchors = [[9, 3.5, 3],
-               [9, 0, 3],
-               [0, 0, 3],
-               [0, 3.5, 3],
-               [3, 1.75, 3],
-               [6, 1.75, 3]]
+        clear_line = plt.plot(list(df['LogTime']), list(df['RSSI']), label='clear')
+        sma_line = plt.plot(list(df['LogTime']), get_sma(list(df['RSSI'])), label='sma')
+        comp_filt_line = plt.plot(list(df['LogTime']), get_comp_filt(list(df['RSSI'])), label='comp_filt')
 
-    positions_x = list()
-    positions_y = list()
-
-    for distances in df['Distance'].values:
-        trilateration = Trilateration(anchors=anchors, distances=distances)
-        point = trilateration.get_point()
-        positions_x.append(point[0])
-        positions_y.append(point[1])
-
-    df['X'] = pd.Series(positions_x)
-    df['Y'] = pd.Series(positions_y)
-
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.plot(df['X'], df['Y'], df['LogTime'])
-    ax.legend()
-
-    plt.show()
+        plt.xlabel('Time')
+        plt.ylabel('RSSI')
+        plt.title(log_file.split('\\')[1])
+        plt.text(60, .025, r'$\mu=100,\ \sigma=15$')
+        plt.ylim((0, 150))
+        plt.legend(labels=['clear', 'sma', 'comp_filt'], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+        plt.savefig('graph\\'+log_file.split('\\')[1]+'.png')
+        plt.show()
